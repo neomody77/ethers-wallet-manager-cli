@@ -13,7 +13,7 @@ const program = new Command();
 program
   .name('ethers-wallet-manager')
   .description('CLI for managing Ethereum wallets with ethers.js')
-  .version('1.2.0')
+  .version('1.3.0')
   .option('--password-help', 'Show password options help')
   .hook('preAction', (thisCommand) => {
     if (thisCommand.opts().passwordHelp) {
@@ -426,6 +426,169 @@ program
       console.log(chalk.green(`✓ Password updated successfully for wallet '${alias}'`));
     } catch (error) {
       console.error(chalk.red(`✗ Failed to update password: ${error}`));
+    }
+  });
+
+// Command aliases for better user experience
+program
+  .command('new <alias>')
+  .description('Create a new wallet (alias for create)')
+  .option('-p, --password <password>', 'Wallet password (or use env: NEW_WALLET_PASSWORD)')
+  .option('--hd-path <path>', 'HD derivation path for HD wallets')
+  .option('--network <network>', 'Network for this wallet (overrides current network)')
+  .option('--no-keystore', 'Skip saving keystore file')
+  .action(async (alias: string, options) => {
+    const wm = initWalletManager();
+    
+    if (wm.hasWallet(alias)) {
+      console.error(chalk.red(`✗ Wallet with alias '${alias}' already exists`));
+      return;
+    }
+
+    try {
+      const password = await PasswordManager.getNewWalletPassword(alias, options.password);
+      
+      const wallet = await wm.createWallet({
+        alias,
+        password,
+        hdPath: options.hdPath,
+        network: options.network,
+        saveKeystore: options.keystore !== false
+      });
+      
+      console.log(chalk.green(`✓ Wallet '${alias}' created successfully`));
+      console.log(`${chalk.blue('Address:')} ${wallet.address}`);
+      console.log(`${chalk.blue('Network:')} ${wm.getWalletNetwork(alias)}`);
+      if (options.hdPath) {
+        console.log(`${chalk.blue('HD Path:')} ${options.hdPath}`);
+      }
+    } catch (error) {
+      console.error(chalk.red(`✗ Failed to create wallet: ${error}`));
+    }
+  });
+
+program
+  .command('load <alias>')
+  .description('Import a wallet (alias for import)')
+  .option('-p, --password <password>', 'New wallet password (or use env: NEW_WALLET_PASSWORD)')
+  .option('--private-key <key>', 'Private key to import')
+  .option('--mnemonic <phrase>', 'Mnemonic phrase to import')
+  .option('--keystore <file>', 'Keystore file to import')
+  .option('--keystore-password <password>', 'Keystore file password (or use env: KEYSTORE_PASSWORD)')
+  .option('--network <network>', 'Network for this wallet (overrides current network)')
+  .option('--no-save', 'Skip saving keystore file')
+  .action(async (alias: string, options) => {
+    const wm = initWalletManager();
+    
+    if (wm.hasWallet(alias)) {
+      console.error(chalk.red(`✗ Wallet with alias '${alias}' already exists`));
+      return;
+    }
+
+    try {
+      let keystoreJson: string | undefined;
+      let keystorePassword: string | undefined;
+      
+      if (options.keystore) {
+        if (!fs.existsSync(options.keystore)) {
+          console.error(chalk.red(`✗ Keystore file not found: ${options.keystore}`));
+          return;
+        }
+        keystoreJson = fs.readFileSync(options.keystore, 'utf8');
+        keystorePassword = await PasswordManager.getKeystorePassword(
+          options.keystore, 
+          options.keystorePassword
+        );
+      }
+
+      const password = await PasswordManager.getNewWalletPassword(alias, options.password);
+
+      const wallet = await wm.importWallet({
+        alias,
+        password,
+        privateKey: options.privateKey,
+        mnemonic: options.mnemonic,
+        keystoreJson,
+        keystorePassword,
+        network: options.network,
+        saveKeystore: options.save !== false
+      });
+      
+      console.log(chalk.green(`✓ Wallet '${alias}' imported successfully`));
+      console.log(`${chalk.blue('Address:')} ${wallet.address}`);
+      console.log(`${chalk.blue('Network:')} ${wm.getWalletNetwork(alias)}`);
+    } catch (error) {
+      console.error(chalk.red(`✗ Failed to import wallet: ${error}`));
+    }
+  });
+
+program
+  .command('delete [alias]')
+  .description('Remove wallet(s) (alias for remove)')
+  .option('-f, --force', 'Force removal without confirmation')
+  .option('-a, --all', 'Remove all wallets')
+  .action(async (alias: string | undefined, options) => {
+    const wm = initWalletManager();
+    
+    if (options.all) {
+      const wallets = wm.listWallets();
+      
+      if (wallets.length === 0) {
+        console.log(chalk.yellow('No wallets found to remove'));
+        return;
+      }
+
+      if (!options.force) {
+        console.log(chalk.yellow(`⚠ This will permanently delete ${wallets.length} wallet(s) and their keystore files:`));
+        wallets.forEach(wallet => {
+          console.log(chalk.yellow(`  • ${wallet.alias} (${wallet.address})`));
+        });
+        console.log(chalk.yellow('Use --force flag to confirm removal'));
+        return;
+      }
+
+      console.log(chalk.blue(`Removing ${wallets.length} wallet(s)...`));
+      let removed = 0;
+      let failed = 0;
+
+      for (const wallet of wallets) {
+        const success = wm.removeWallet(wallet.alias);
+        if (success) {
+          console.log(chalk.green(`✓ Removed wallet '${wallet.alias}'`));
+          removed++;
+        } else {
+          console.error(chalk.red(`✗ Failed to remove wallet '${wallet.alias}'`));
+          failed++;
+        }
+      }
+
+      console.log(chalk.blue(`\nSummary: ${removed} removed, ${failed} failed`));
+      return;
+    }
+
+    if (!alias) {
+      console.error(chalk.red('✗ Please specify a wallet alias or use --all flag'));
+      console.log('Usage: delete <alias> [--force]');
+      console.log('       delete --all [--force]');
+      return;
+    }
+
+    if (!wm.hasWallet(alias)) {
+      console.error(chalk.red(`✗ Wallet '${alias}' not found`));
+      return;
+    }
+
+    if (!options.force) {
+      console.log(chalk.yellow(`⚠ This will permanently delete wallet '${alias}' and its keystore file`));
+      console.log(chalk.yellow('Use --force flag to confirm removal'));
+      return;
+    }
+
+    const success = wm.removeWallet(alias);
+    if (success) {
+      console.log(chalk.green(`✓ Wallet '${alias}' removed successfully`));
+    } else {
+      console.error(chalk.red(`✗ Failed to remove wallet '${alias}'`));
     }
   });
 

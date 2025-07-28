@@ -28,17 +28,23 @@ After installation, you can use either command:
 
 ### Create a New Wallet
 ```bash
-vlet create --alias my-wallet --password mySecurePassword
+vlet create my-wallet --password mySecurePassword
+# or use alias:
+vlet new my-wallet --password mySecurePassword
 ```
 
 ### Import from Mnemonic
 ```bash
-vlet import --alias imported-wallet --mnemonic "your twelve word mnemonic phrase here" --password myPassword
+vlet import imported-wallet --mnemonic "your twelve word mnemonic phrase here" --password myPassword
+# or use alias:
+vlet load imported-wallet --mnemonic "your twelve word mnemonic phrase here" --password myPassword
 ```
 
 ### Import from Private Key
 ```bash
-vlet import --alias pk-wallet --private-key 0x1234... --password myPassword
+vlet import pk-wallet --private-key 0x1234... --password myPassword
+# or use alias:
+vlet load pk-wallet --private-key 0x1234... --password myPassword
 ```
 
 ### List All Wallets
@@ -61,6 +67,13 @@ vlet info my-wallet --show-private-key --password mySecurePassword
 vlet config set-default-account my-wallet
 ```
 
+### Remove a Wallet
+```bash
+vlet remove my-wallet --force
+# or use alias:
+vlet delete my-wallet --force
+```
+
 ### Sign a Message
 ```bash
 vlet sign-message my-wallet "Hello, World!" --password mySecurePassword
@@ -69,11 +82,11 @@ vlet sign-message my-wallet "Hello, World!" --password mySecurePassword
 ## Commands
 
 **Wallet Management:**
-- `create <alias>` - Create a new wallet
-- `import <alias>` - Import an existing wallet
+- `create <alias>` / `new <alias>` - Create a new wallet
+- `import <alias>` / `load <alias>` - Import an existing wallet
 - `list` - Show all managed wallets
 - `info <alias>` - Show wallet information
-- `remove <alias>` - Remove a wallet
+- `remove <alias>` / `delete <alias>` - Remove a wallet
 - `sign-message <alias> <message>` - Sign a message with a wallet
 - `set-network <alias> <network>` - Set network for a specific wallet
 - `update-password <alias>` - Update wallet password
