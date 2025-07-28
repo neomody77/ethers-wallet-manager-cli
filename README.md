@@ -46,6 +46,16 @@ vlet import --alias pk-wallet --private-key 0x1234... --password myPassword
 vlet list
 ```
 
+### Show Wallet Information
+```bash
+vlet wallet info my-wallet
+```
+
+### Show Wallet Information with Private Key
+```bash
+vlet wallet info my-wallet --show-private-key --password mySecurePassword
+```
+
 ### Load and Use a Wallet
 ```bash
 vlet load --alias my-wallet --password mySecurePassword

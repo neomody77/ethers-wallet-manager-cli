@@ -13,7 +13,7 @@ const program = new Command();
 program
   .name('ethers-wallet-manager')
   .description('CLI for managing Ethereum wallets with ethers.js')
-  .version('1.0.0')
+  .version('1.1.0')
   .option('--password-help', 'Show password options help')
   .hook('preAction', (thisCommand) => {
     if (thisCommand.opts().passwordHelp) {
@@ -246,7 +246,9 @@ walletCmd
 walletCmd
   .command('info <alias>')
   .description('Show wallet information')
-  .action((alias: string) => {
+  .option('--show-private-key', 'Show private key (requires password)')
+  .option('-p, --password <password>', 'Wallet password (required if showing private key)')
+  .action(async (alias: string, options) => {
     const wm = initWalletManager();
     const info = wm.getWalletInfo(alias);
     
@@ -264,6 +266,17 @@ walletCmd
     }
     if (info.keystorePath) {
       console.log(`${chalk.green('Keystore:')} ${info.keystorePath}`);
+    }
+
+    if (options.showPrivateKey) {
+      try {
+        const password = await PasswordManager.getWalletPassword(alias, options.password);
+        const wallet = await wm.loadWallet(alias, password);
+        console.log(`${chalk.red('Private Key:')} ${wallet.privateKey}`);
+        console.log(chalk.yellow('⚠ Keep your private key secure and never share it with anyone!'));
+      } catch (error) {
+        console.error(chalk.red(`✗ Failed to load wallet: ${error}`));
+      }
     }
   });
 
