@@ -1,0 +1,31 @@
+{
+  "name": "ethers-wallet-manager",
+  "version": "1.0.0",
+  "description": "CLI tool for managing Ethereum wallets with ethers.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "ethers-wallet-manager": "./dist/cli.js",
+    "ewm": "./dist/cli.js"
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/example.ts",
+    "start": "node dist/index.js",
+    "cli": "ts-node src/cli.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@types/inquirer": "^9.0.8",
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0",
+    "ethers": "^6.15.0",
+    "inquirer": "^12.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.1.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
