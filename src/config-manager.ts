@@ -74,6 +74,10 @@ export class ConfigManager {
     this.saveConfig({ currentNetwork: network });
   }
 
+  updateDefaultAccount(alias: string): void {
+    this.saveConfig({ defaultAccount: alias });
+  }
+
   getKeystoreDir(): string {
     return this.getConfig().keystoreDir;
   }
@@ -84,6 +88,10 @@ export class ConfigManager {
 
   getCurrentNetwork(): string {
     return this.getConfig().currentNetwork;
+  }
+
+  getDefaultAccount(): string | undefined {
+    return this.getConfig().defaultAccount;
   }
 
   getConfigDir(): string {

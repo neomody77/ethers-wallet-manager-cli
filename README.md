@@ -48,28 +48,45 @@ vlet list
 
 ### Show Wallet Information
 ```bash
-vlet wallet info my-wallet
+vlet info my-wallet
 ```
 
 ### Show Wallet Information with Private Key
 ```bash
-vlet wallet info my-wallet --show-private-key --password mySecurePassword
+vlet info my-wallet --show-private-key --password mySecurePassword
 ```
 
-### Load and Use a Wallet
+### Set Default Account
 ```bash
-vlet load --alias my-wallet --password mySecurePassword
+vlet config set-default-account my-wallet
+```
+
+### Sign a Message
+```bash
+vlet sign-message my-wallet "Hello, World!" --password mySecurePassword
 ```
 
 ## Commands
 
-- `create` - Create a new wallet
-- `import` - Import an existing wallet
+**Wallet Management:**
+- `create <alias>` - Create a new wallet
+- `import <alias>` - Import an existing wallet
 - `list` - Show all managed wallets
-- `load` - Load a wallet for use
-- `remove` - Remove a wallet
-- `sign` - Sign a message with a wallet
-- `config` - Manage configuration settings
+- `info <alias>` - Show wallet information
+- `remove <alias>` - Remove a wallet
+- `sign-message <alias> <message>` - Sign a message with a wallet
+- `set-network <alias> <network>` - Set network for a specific wallet
+- `update-password <alias>` - Update wallet password
+
+**Configuration:**
+- `config show` - Show current configuration
+- `config set-keystore-dir <directory>` - Set keystore directory
+- `config set-default-network <network>` - Set default network
+- `config set-current-network <network>` - Set current network
+- `config set-default-account <alias>` - Set default account/wallet
+- `config export <file>` - Export configuration
+- `config import <file>` - Import configuration
+- `config reset` - Reset to defaults
 
 ## Configuration
 

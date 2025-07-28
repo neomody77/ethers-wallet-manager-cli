@@ -286,6 +286,14 @@ export class WalletManager {
     return this.currentNetwork;
   }
 
+  updateDefaultAccount(alias: string): void {
+    this.configManager.updateDefaultAccount(alias);
+  }
+
+  getDefaultAccount(): string | undefined {
+    return this.configManager.getDefaultAccount();
+  }
+
   getWalletNetwork(alias: string): string {
     const info = this.getWalletInfo(alias);
     return info?.network || this.currentNetwork;

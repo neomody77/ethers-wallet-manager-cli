@@ -26,6 +26,7 @@ export interface ConfigFile {
   keystoreDir: string;
   defaultNetwork: string;
   currentNetwork: string;
+  defaultAccount?: string;
   version: string;
   createdAt: string;
   updatedAt: string;

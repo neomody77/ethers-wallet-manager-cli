@@ -13,7 +13,7 @@ const program = new Command();
 program
   .name('ethers-wallet-manager')
   .description('CLI for managing Ethereum wallets with ethers.js')
-  .version('1.1.0')
+  .version('1.2.0')
   .option('--password-help', 'Show password options help')
   .hook('preAction', (thisCommand) => {
     if (thisCommand.opts().passwordHelp) {
@@ -52,6 +52,10 @@ configCmd
     console.log(`${chalk.green('Keystore Directory:')} ${wm.getKeystoreDir()}`);
     console.log(`${chalk.green('Default Network:')} ${wm.getDefaultNetwork()}`);
     console.log(`${chalk.green('Current Network:')} ${wm.getCurrentNetwork()}`);
+    const defaultAccount = wm.getDefaultAccount();
+    if (defaultAccount) {
+      console.log(`${chalk.green('Default Account:')} ${defaultAccount}`);
+    }
     console.log(`${chalk.green('Version:')} ${config.version}`);
     console.log(`${chalk.green('Created:')} ${new Date(config.createdAt).toLocaleString()}`);
     console.log(`${chalk.green('Updated:')} ${new Date(config.updatedAt).toLocaleString()}`);
@@ -85,6 +89,19 @@ configCmd
   });
 
 configCmd
+  .command('set-default-account <alias>')
+  .description('Set default account/wallet')
+  .action((alias: string) => {
+    const wm = initWalletManager();
+    if (!wm.hasWallet(alias)) {
+      console.error(chalk.red(`✗ Wallet '${alias}' not found`));
+      return;
+    }
+    wm.updateDefaultAccount(alias);
+    console.log(chalk.green(`✓ Default account updated to: ${alias}`));
+  });
+
+configCmd
   .command('export <file>')
   .description('Export configuration to file')
   .action((file: string) => {
@@ -115,15 +132,8 @@ configCmd
     console.log(chalk.green('✓ Configuration reset to defaults'));
   });
 
-// Wallet management commands
-const walletCmd = program
-  .command('wallet')
-  .description('Manage wallets')
-  .action(() => {
-    walletCmd.help();
-  });
-
-walletCmd
+// Wallet management commands (moved to top level)
+program
   .command('create <alias>')
   .description('Create a new wallet')
   .option('-p, --password <password>', 'Wallet password (or use env: NEW_WALLET_PASSWORD)')
@@ -160,7 +170,7 @@ walletCmd
     }
   });
 
-walletCmd
+program
   .command('import <alias>')
   .description('Import a wallet')
   .option('-p, --password <password>', 'New wallet password (or use env: NEW_WALLET_PASSWORD)')
@@ -215,12 +225,13 @@ walletCmd
     }
   });
 
-walletCmd
+program
   .command('list')
   .description('List all wallets')
   .action(() => {
     const wm = initWalletManager();
     const wallets = wm.listWallets();
+    const defaultAccount = wm.getDefaultAccount();
     
     if (wallets.length === 0) {
       console.log(chalk.yellow('No wallets found'));
@@ -229,7 +240,8 @@ walletCmd
 
     console.log(chalk.blue('\n=== Wallets ==='));
     wallets.forEach(wallet => {
-      console.log(`${chalk.green('•')} ${wallet.alias}`);
+      const isDefault = wallet.alias === defaultAccount;
+      console.log(`${chalk.green('•')} ${wallet.alias}${isDefault ? chalk.cyan(' (default)') : ''}`);
       console.log(`  ${chalk.gray('Address:')} ${wallet.address}`);
       console.log(`  ${chalk.gray('Network:')} ${wallet.network || 'current'}`);
       console.log(`  ${chalk.gray('HD Wallet:')} ${wallet.isHD ? 'Yes' : 'No'}`);
@@ -243,7 +255,7 @@ walletCmd
     });
   });
 
-walletCmd
+program
   .command('info <alias>')
   .description('Show wallet information')
   .option('--show-private-key', 'Show private key (requires password)')
@@ -257,7 +269,10 @@ walletCmd
       return;
     }
 
-    console.log(chalk.blue(`\n=== Wallet: ${alias} ===`));
+    const defaultAccount = wm.getDefaultAccount();
+    const isDefault = alias === defaultAccount;
+
+    console.log(chalk.blue(`\n=== Wallet: ${alias}${isDefault ? chalk.cyan(' (default)') : ''} ===`));
     console.log(`${chalk.green('Address:')} ${info.address}`);
     console.log(`${chalk.green('Network:')} ${info.network || 'current'}`);
     console.log(`${chalk.green('HD Wallet:')} ${info.isHD ? 'Yes' : 'No'}`);
@@ -280,7 +295,7 @@ walletCmd
     }
   });
 
-walletCmd
+program
   .command('remove [alias]')
   .description('Remove wallet(s)')
   .option('-f, --force', 'Force removal without confirmation')
@@ -326,8 +341,8 @@ walletCmd
 
     if (!alias) {
       console.error(chalk.red('✗ Please specify a wallet alias or use --all flag'));
-      console.log('Usage: wallet remove <alias> [--force]');
-      console.log('       wallet remove --all [--force]');
+      console.log('Usage: remove <alias> [--force]');
+      console.log('       remove --all [--force]');
       return;
     }
 
@@ -350,7 +365,7 @@ walletCmd
     }
   });
 
-walletCmd
+program
   .command('sign-message <alias> <message>')
   .description('Sign a message with wallet')
   .option('-p, --password <password>', 'Wallet password (or use env: WALLET_PASSWORD)')
@@ -370,7 +385,7 @@ walletCmd
     }
   });
 
-walletCmd
+program
   .command('set-network <alias> <network>')
   .description('Set network for a specific wallet')
   .action((alias: string, network: string) => {
@@ -389,7 +404,7 @@ walletCmd
     }
   });
 
-walletCmd
+program
   .command('update-password <alias>')
   .description('Update wallet password')
   .option('--old-password <password>', 'Current wallet password (or use env: WALLET_PASSWORD)')
