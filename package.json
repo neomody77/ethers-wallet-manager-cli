@@ -8,6 +8,30 @@
     "ethers-wallet-manager": "./dist/cli.js",
     "ewm": "./dist/cli.js"
   },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "ethereum",
+    "wallet",
+    "ethers",
+    "cli",
+    "cryptocurrency",
+    "blockchain",
+    "keystore",
+    "mnemonic"
+  ],
+  "author": "neomody77",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neomody77/ethers-wallet-manager-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/neomody77/ethers-wallet-manager-cli/issues"
+  },
+  "homepage": "https://github.com/neomody77/ethers-wallet-manager-cli#readme",
   "license": "MIT",
   "scripts": {
     "build": "tsc",
