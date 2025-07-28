@@ -6,7 +6,7 @@
   "types": "dist/index.d.ts",
   "bin": {
     "ethers-wallet-manager": "./dist/cli.js",
-    "ewm": "./dist/cli.js"
+    "vlet": "./dist/cli.js"
   },
   "files": [
     "dist/**/*",

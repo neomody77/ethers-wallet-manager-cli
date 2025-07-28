@@ -12,7 +12,7 @@ npm install -g ethers-wallet-manager
 
 After installation, you can use either command:
 - `ethers-wallet-manager` (full command)
-- `ewm` (short alias)
+- `vlet` (short alias)
 
 ## Features
 
@@ -28,27 +28,27 @@ After installation, you can use either command:
 
 ### Create a New Wallet
 ```bash
-ewm create --alias my-wallet --password mySecurePassword
+vlet create --alias my-wallet --password mySecurePassword
 ```
 
 ### Import from Mnemonic
 ```bash
-ewm import --alias imported-wallet --mnemonic "your twelve word mnemonic phrase here" --password myPassword
+vlet import --alias imported-wallet --mnemonic "your twelve word mnemonic phrase here" --password myPassword
 ```
 
 ### Import from Private Key
 ```bash
-ewm import --alias pk-wallet --private-key 0x1234... --password myPassword
+vlet import --alias pk-wallet --private-key 0x1234... --password myPassword
 ```
 
 ### List All Wallets
 ```bash
-ewm list
+vlet list
 ```
 
 ### Load and Use a Wallet
 ```bash
-ewm load --alias my-wallet --password mySecurePassword
+vlet load --alias my-wallet --password mySecurePassword
 ```
 
 ## Commands
