@@ -132,6 +132,364 @@ configCmd
     console.log(chalk.green('✓ Configuration reset to defaults'));
   });
 
+// Quick commands
+const quickCmd = program
+  .command('quick')
+  .description('Manage quick command templates')
+  .action(() => {
+    quickCmd.help();
+  });
+
+quickCmd
+  .command('add <name> <parameters> <template>')
+  .description('Add a new quick command template')
+  .option('-d, --description <desc>', 'Description of the quick command')
+  .action((name: string, parameters: string, template: string, options) => {
+    const wm = initWalletManager();
+    
+    // Parse parameters - expect format like "aa bb cc"
+    const paramList = parameters.trim().split(/\s+/).filter(p => p.length > 0);
+    
+    // Auto-detect parameters from template if not provided
+    const detectedParams = wm.getQuickCommandManager().parseParametersFromTemplate(template);
+    const finalParams = paramList.length > 0 ? paramList : detectedParams;
+    
+    if (finalParams.length === 0) {
+      console.error(chalk.red('✗ No parameters specified and none detected in template'));
+      console.log('Example: vlet quick add mint "amount recipient" "call my-wallet 0x123... \\"mint(uint256,address)\\" $amount $recipient"');
+      return;
+    }
+
+    try {
+      wm.addQuickCommand(name, finalParams, template, options.description);
+      console.log(chalk.green(`✓ Quick command '${name}' added successfully`));
+      console.log(`${chalk.blue('Parameters:')} ${finalParams.join(', ')}`);
+      console.log(`${chalk.blue('Template:')} ${template}`);
+      if (options.description) {
+        console.log(`${chalk.blue('Description:')} ${options.description}`);
+      }
+    } catch (error) {
+      console.error(chalk.red(`✗ Failed to add quick command: ${error}`));
+    }
+  });
+
+quickCmd
+  .command('list')
+  .description('List all quick commands')
+  .action(() => {
+    const wm = initWalletManager();
+    const commands = wm.listQuickCommands();
+    
+    if (commands.length === 0) {
+      console.log(chalk.yellow('No quick commands found'));
+      return;
+    }
+
+    console.log(chalk.blue('\n=== Quick Commands ==='));
+    commands.forEach(cmd => {
+      console.log(`${chalk.green('•')} ${cmd.name}`);
+      console.log(`  ${chalk.gray('Parameters:')} ${cmd.parameters.join(', ')}`);
+      console.log(`  ${chalk.gray('Template:')} ${cmd.template}`);
+      if (cmd.description) {
+        console.log(`  ${chalk.gray('Description:')} ${cmd.description}`);
+      }
+      console.log(`  ${chalk.gray('Created:')} ${new Date(cmd.createdAt).toLocaleString()}`);
+      console.log();
+    });
+  });
+
+quickCmd
+  .command('call <name> [args...]')
+  .description('Execute a quick command')
+  .option('-p, --password <password>', 'Wallet password (or use env: WALLET_PASSWORD)')
+  .option('--wait', 'Wait for transaction confirmation')
+  .action(async (name: string, args: string[], options) => {
+    const wm = initWalletManager();
+    const command = wm.getQuickCommand(name);
+    
+    if (!command) {
+      console.error(chalk.red(`✗ Quick command '${name}' not found`));
+      return;
+    }
+
+    if (args.length !== command.parameters.length) {
+      console.error(chalk.red(`✗ Expected ${command.parameters.length} arguments, got ${args.length}`));
+      console.log(`Usage: vlet quick call ${name} ${command.parameters.join(' ')}`);
+      return;
+    }
+
+    try {
+      console.log(chalk.blue(`Executing quick command '${name}'...`));
+      console.log(`${chalk.gray('Parameters:')} ${command.parameters.map((p, i) => `${p}=${args[i]}`).join(', ')}`);
+      
+      const expandedCommand = wm.getQuickCommandManager().executeQuickCommand(name, args);
+      console.log(`${chalk.gray('Expanded:')} ${expandedCommand}`);
+
+      // Parse expanded command to get wallet alias for password
+      const parts = expandedCommand.split(' ');
+      let walletAlias = '';
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (parts[i] === 'call' || parts[i] === 'send') {
+          walletAlias = parts[i + 1];
+          break;
+        }
+      }
+
+      if (walletAlias && !wm.getWallet(walletAlias)) {
+        const password = await PasswordManager.getWalletPassword(walletAlias, options.password);
+        await wm.loadWallet(walletAlias, password);
+      }
+
+      const tx = await wm.executeQuickCommand(name, args);
+      
+      console.log(chalk.green('✓ Transaction sent successfully'));
+      console.log(`${chalk.blue('Transaction Hash:')} ${tx.hash}`);
+      
+      if (options.wait) {
+        console.log(chalk.blue('Waiting for confirmation...'));
+        const receipt = await tx.wait();
+        console.log(chalk.green('✓ Transaction confirmed'));
+        console.log(`${chalk.blue('Block Number:')} ${receipt.blockNumber}`);
+        console.log(`${chalk.blue('Gas Used:')} ${receipt.gasUsed.toString()}`);
+      }
+    } catch (error) {
+      console.error(chalk.red(`✗ Failed to execute quick command: ${error}`));
+    }
+  });
+
+quickCmd
+  .command('remove <name>')
+  .description('Remove a quick command')
+  .option('-f, --force', 'Force removal without confirmation')
+  .action((name: string, options) => {
+    const wm = initWalletManager();
+    const command = wm.getQuickCommand(name);
+    
+    if (!command) {
+      console.error(chalk.red(`✗ Quick command '${name}' not found`));
+      return;
+    }
+
+    if (!options.force) {
+      console.log(chalk.yellow(`⚠ This will permanently delete quick command '${name}':`));
+      console.log(`  ${chalk.gray('Parameters:')} ${command.parameters.join(', ')}`);
+      console.log(`  ${chalk.gray('Template:')} ${command.template}`);
+      console.log(chalk.yellow('Use --force flag to confirm removal'));
+      return;
+    }
+
+    const success = wm.removeQuickCommand(name);
+    if (success) {
+      console.log(chalk.green(`✓ Quick command '${name}' removed successfully`));
+    } else {
+      console.error(chalk.red(`✗ Failed to remove quick command '${name}'`));
+    }
+  });
+
+// Contract management
+const contractCmd = program
+  .command('contract')
+  .description('Manage contract aliases')
+  .action(() => {
+    contractCmd.help();
+  });
+
+contractCmd
+  .command('add <alias> <address>')
+  .description('Add a contract alias')
+  .option('-n, --name <name>', 'Contract name')
+  .option('-d, --description <desc>', 'Contract description')
+  .option('--network <network>', 'Contract network')
+  .option('--abi <abi>', 'Contract ABI JSON file path')
+  .action((alias: string, address: string, options) => {
+    const wm = initWalletManager();
+    
+    if (wm.hasContract(alias)) {
+      console.error(chalk.red(`✗ Contract alias '${alias}' already exists`));
+      return;
+    }
+
+    try {
+      let abi;
+      if (options.abi) {
+        if (!fs.existsSync(options.abi)) {
+          console.error(chalk.red(`✗ ABI file not found: ${options.abi}`));
+          return;
+        }
+        const abiData = fs.readFileSync(options.abi, 'utf8');
+        abi = JSON.parse(abiData);
+      }
+
+      wm.addContract(alias, address, {
+        name: options.name,
+        description: options.description,
+        network: options.network,
+        abi
+      });
+      
+      console.log(chalk.green(`✓ Contract alias '${alias}' added successfully`));
+      console.log(`${chalk.blue('Address:')} ${address}`);
+      if (options.name) {
+        console.log(`${chalk.blue('Name:')} ${options.name}`);
+      }
+      if (options.description) {
+        console.log(`${chalk.blue('Description:')} ${options.description}`);
+      }
+      if (options.network) {
+        console.log(`${chalk.blue('Network:')} ${options.network}`);
+      }
+    } catch (error) {
+      console.error(chalk.red(`✗ Failed to add contract: ${error}`));
+    }
+  });
+
+contractCmd
+  .command('list')
+  .description('List all contract aliases')
+  .action(() => {
+    const wm = initWalletManager();
+    const contracts = wm.listContracts();
+    
+    if (contracts.length === 0) {
+      console.log(chalk.yellow('No contract aliases found'));
+      return;
+    }
+
+    console.log(chalk.blue('\n=== Contract Aliases ==='));
+    contracts.forEach(contract => {
+      console.log(`${chalk.green('•')} ${contract.alias}`);
+      console.log(`  ${chalk.gray('Address:')} ${contract.address}`);
+      if (contract.name) {
+        console.log(`  ${chalk.gray('Name:')} ${contract.name}`);
+      }
+      if (contract.description) {
+        console.log(`  ${chalk.gray('Description:')} ${contract.description}`);
+      }
+      if (contract.network) {
+        console.log(`  ${chalk.gray('Network:')} ${contract.network}`);
+      }
+      console.log(`  ${chalk.gray('Created:')} ${new Date(contract.createdAt).toLocaleString()}`);
+      console.log();
+    });
+  });
+
+contractCmd
+  .command('info <alias>')
+  .description('Show contract information')
+  .action((alias: string) => {
+    const wm = initWalletManager();
+    const contract = wm.getContract(alias);
+    
+    if (!contract) {
+      console.error(chalk.red(`✗ Contract alias '${alias}' not found`));
+      return;
+    }
+
+    console.log(chalk.blue(`\n=== Contract: ${alias} ===`));
+    console.log(`${chalk.green('Address:')} ${contract.address}`);
+    if (contract.name) {
+      console.log(`${chalk.green('Name:')} ${contract.name}`);
+    }
+    if (contract.description) {
+      console.log(`${chalk.green('Description:')} ${contract.description}`);
+    }
+    if (contract.network) {
+      console.log(`${chalk.green('Network:')} ${contract.network}`);
+    }
+    if (contract.abi) {
+      console.log(`${chalk.green('ABI:')} Available (${contract.abi.length} functions/events)`);
+    }
+    console.log(`${chalk.green('Created:')} ${new Date(contract.createdAt).toLocaleString()}`);
+    console.log(`${chalk.green('Updated:')} ${new Date(contract.updatedAt).toLocaleString()}`);
+  });
+
+contractCmd
+  .command('remove <alias>')
+  .description('Remove a contract alias')
+  .option('-f, --force', 'Force removal without confirmation')
+  .action((alias: string, options) => {
+    const wm = initWalletManager();
+    const contract = wm.getContract(alias);
+    
+    if (!contract) {
+      console.error(chalk.red(`✗ Contract alias '${alias}' not found`));
+      return;
+    }
+
+    if (!options.force) {
+      console.log(chalk.yellow(`⚠ This will permanently delete contract alias '${alias}':`));
+      console.log(`  ${chalk.gray('Address:')} ${contract.address}`);
+      if (contract.name) {
+        console.log(`  ${chalk.gray('Name:')} ${contract.name}`);
+      }
+      console.log(chalk.yellow('Use --force flag to confirm removal'));
+      return;
+    }
+
+    const success = wm.removeContract(alias);
+    if (success) {
+      console.log(chalk.green(`✓ Contract alias '${alias}' removed successfully`));
+    } else {
+      console.error(chalk.red(`✗ Failed to remove contract alias '${alias}'`));
+    }
+  });
+
+contractCmd
+  .command('update <alias>')
+  .description('Update contract alias information')
+  .option('-a, --address <address>', 'New contract address')
+  .option('-n, --name <name>', 'New contract name')
+  .option('-d, --description <desc>', 'New contract description')
+  .option('--network <network>', 'New contract network')
+  .option('--abi <abi>', 'New contract ABI JSON file path')
+  .action((alias: string, options) => {
+    const wm = initWalletManager();
+    
+    if (!wm.hasContract(alias)) {
+      console.error(chalk.red(`✗ Contract alias '${alias}' not found`));
+      return;
+    }
+
+    try {
+      const updates: any = {};
+      
+      if (options.address) updates.address = options.address;
+      if (options.name) updates.name = options.name;
+      if (options.description) updates.description = options.description;
+      if (options.network) updates.network = options.network;
+      
+      if (options.abi) {
+        if (!fs.existsSync(options.abi)) {
+          console.error(chalk.red(`✗ ABI file not found: ${options.abi}`));
+          return;
+        }
+        const abiData = fs.readFileSync(options.abi, 'utf8');
+        updates.abi = JSON.parse(abiData);
+      }
+
+      if (Object.keys(updates).length === 0) {
+        console.error(chalk.red('✗ No updates specified'));
+        return;
+      }
+
+      const success = wm.updateContract(alias, updates);
+      if (success) {
+        console.log(chalk.green(`✓ Contract alias '${alias}' updated successfully`));
+        const updated = wm.getContract(alias);
+        if (updated) {
+          console.log(`${chalk.blue('Address:')} ${updated.address}`);
+          if (updated.name) console.log(`${chalk.blue('Name:')} ${updated.name}`);
+          if (updated.description) console.log(`${chalk.blue('Description:')} ${updated.description}`);
+          if (updated.network) console.log(`${chalk.blue('Network:')} ${updated.network}`);
+        }
+      } else {
+        console.error(chalk.red(`✗ Failed to update contract alias '${alias}'`));
+      }
+    } catch (error) {
+      console.error(chalk.red(`✗ Failed to update contract: ${error}`));
+    }
+  });
+
 // Wallet management commands (moved to top level)
 program
   .command('create <alias>')
@@ -426,6 +784,122 @@ program
       console.log(chalk.green(`✓ Password updated successfully for wallet '${alias}'`));
     } catch (error) {
       console.error(chalk.red(`✗ Failed to update password: ${error}`));
+    }
+  });
+
+program
+  .command('call <alias> <contract-address> <method-signature> [args...]')
+  .description('Call a contract method with specified wallet')
+  .option('-p, --password <password>', 'Wallet password (or use env: WALLET_PASSWORD)')
+  .option('--rpc-url <url>', 'RPC URL to use for the call')
+  .option('--gas-limit <limit>', 'Gas limit for the transaction')
+  .option('--gas-price <price>', 'Gas price in gwei')
+  .option('--value <amount>', 'ETH amount to send with the call')
+  .option('--wait', 'Wait for transaction confirmation')
+  .action(async (alias: string, contractAddress: string, methodSignature: string, args: string[], options) => {
+    const wm = initWalletManager();
+    
+    if (!wm.hasWallet(alias)) {
+      console.error(chalk.red(`✗ Wallet '${alias}' not found`));
+      return;
+    }
+
+    try {
+      const password = await PasswordManager.getWalletPassword(alias, options.password);
+      await wm.loadWallet(alias, password);
+      
+      console.log(chalk.blue(`Calling contract method...`));
+      console.log(`${chalk.gray('Wallet:')} ${alias}`);
+      console.log(`${chalk.gray('Contract:')} ${contractAddress}`);
+      console.log(`${chalk.gray('Method:')} ${methodSignature}`);
+      console.log(`${chalk.gray('Args:')} ${args.join(', ')}`);
+      if (options.rpcUrl) {
+        console.log(`${chalk.gray('RPC URL:')} ${options.rpcUrl}`);
+      }
+
+      const tx = await wm.callContract(
+        alias,
+        contractAddress,
+        methodSignature,
+        args,
+        options.rpcUrl,
+        {
+          gasLimit: options.gasLimit,
+          gasPrice: options.gasPrice,
+          value: options.value
+        }
+      );
+
+      console.log(chalk.green('✓ Transaction sent successfully'));
+      console.log(`${chalk.blue('Transaction Hash:')} ${tx.hash}`);
+      
+      if (options.wait) {
+        console.log(chalk.blue('Waiting for confirmation...'));
+        const receipt = await tx.wait();
+        console.log(chalk.green('✓ Transaction confirmed'));
+        console.log(`${chalk.blue('Block Number:')} ${receipt.blockNumber}`);
+        console.log(`${chalk.blue('Gas Used:')} ${receipt.gasUsed.toString()}`);
+      }
+    } catch (error) {
+      console.error(chalk.red(`✗ Failed to call contract: ${error}`));
+    }
+  });
+
+program
+  .command('send <alias> <contract-address> <method-signature> [args...]')
+  .description('Send transaction to contract (alias for call)')
+  .option('-p, --password <password>', 'Wallet password (or use env: WALLET_PASSWORD)')
+  .option('--rpc-url <url>', 'RPC URL to use for the call')
+  .option('--gas-limit <limit>', 'Gas limit for the transaction')
+  .option('--gas-price <price>', 'Gas price in gwei')
+  .option('--value <amount>', 'ETH amount to send with the call')
+  .option('--wait', 'Wait for transaction confirmation')
+  .action(async (alias: string, contractAddress: string, methodSignature: string, args: string[], options) => {
+    const wm = initWalletManager();
+    
+    if (!wm.hasWallet(alias)) {
+      console.error(chalk.red(`✗ Wallet '${alias}' not found`));
+      return;
+    }
+
+    try {
+      const password = await PasswordManager.getWalletPassword(alias, options.password);
+      await wm.loadWallet(alias, password);
+      
+      console.log(chalk.blue(`Sending transaction...`));
+      console.log(`${chalk.gray('Wallet:')} ${alias}`);
+      console.log(`${chalk.gray('Contract:')} ${contractAddress}`);
+      console.log(`${chalk.gray('Method:')} ${methodSignature}`);
+      console.log(`${chalk.gray('Args:')} ${args.join(', ')}`);
+      if (options.rpcUrl) {
+        console.log(`${chalk.gray('RPC URL:')} ${options.rpcUrl}`);
+      }
+
+      const tx = await wm.callContract(
+        alias,
+        contractAddress,
+        methodSignature,
+        args,
+        options.rpcUrl,
+        {
+          gasLimit: options.gasLimit,
+          gasPrice: options.gasPrice,
+          value: options.value
+        }
+      );
+
+      console.log(chalk.green('✓ Transaction sent successfully'));
+      console.log(`${chalk.blue('Transaction Hash:')} ${tx.hash}`);
+      
+      if (options.wait) {
+        console.log(chalk.blue('Waiting for confirmation...'));
+        const receipt = await tx.wait();
+        console.log(chalk.green('✓ Transaction confirmed'));
+        console.log(`${chalk.blue('Block Number:')} ${receipt.blockNumber}`);
+        console.log(`${chalk.blue('Gas Used:')} ${receipt.gasUsed.toString()}`);
+      }
+    } catch (error) {
+      console.error(chalk.red(`✗ Failed to send transaction: ${error}`));
     }
   });
 

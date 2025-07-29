@@ -52,3 +52,37 @@ export interface ImportWalletOptions {
 }
 
 export type ManagedWallet = Wallet | HDNodeWallet;
+
+export interface QuickCommand {
+  name: string;
+  parameters: string[];
+  template: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuickCommandsFile {
+  commands: { [name: string]: QuickCommand };
+  version: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContractInfo {
+  alias: string;
+  address: string;
+  name?: string;
+  description?: string;
+  network?: string;
+  abi?: any[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContractsFile {
+  contracts: { [alias: string]: ContractInfo };
+  version: string;
+  createdAt: string;
+  updatedAt: string;
+}
